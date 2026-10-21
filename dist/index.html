@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="根据累计绩点、已修学分和本学期课程，计算达到目标累计绩点所需的各科成绩。支持学校规则配置和本地 Excel 导入。">
+  <title>绩点计划 · 累计绩点目标计算器</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23172b4d'/%3E%3Cpath d='M7 23V17h4v6zm7 0V12h4v11zm7 0V7h4v16z' fill='%233dd6b1'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/xlsx.full.min.js"></script>
+  <script defer src="core.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">▥</span> 绩点计划 <span class="brand-en">GPA PLANNER</span></div><span class="privacy">成绩仅在你的浏览器内计算</span></header>
+  <main>
+    <div class="page-intro"><div><p class="eyebrow">从现在的成绩，到下一步的目标</p><h1>这学期，离目标还有多远？</h1><p class="intro-copy">填写累计成绩与本学期课程，找到一套可以达标的成绩组合。</p></div><button id="load-example" class="button secondary">载入虚构示例</button></div>
+    <div class="workspace">
+      <section class="panel inputs" aria-labelledby="history-title">
+        <div class="section-title"><span class="step">01</span><h2 id="history-title">累计成绩与目标</h2></div>
+        <div class="setup-layout"><div class="history-fields">
+        <div class="field-grid">
+          <label>当前累计绩点<input id="current-gpa" type="number" min="0" step="any" placeholder="例如 3.8" inputmode="decimal"></label>
+          <label>已修总学分<input id="history-credits" type="number" min="0" step="any" placeholder="例如 40" inputmode="decimal"></label>
+        </div>
+        <p class="hint">已修学分必须与当前绩点的统计范围一致。没有历史成绩时填 0。</p>
+        <details id="precision-details"><summary>有精确的历史学分绩点合计？</summary><label class="precision-field">历史 Σ（学分 × 绩点）<input id="history-points" type="number" min="0" step="any" placeholder="选填，例如 152"><span class="hint">填写后优先使用此值，避免当前绩点舍入造成误差。</span></label></details>
+        </div><div class="target-column">
+        <div class="target-field"><label for="target-gpa">目标累计绩点</label><div class="target-input"><input id="target-gpa" type="number" min="0" step="any" placeholder="4.0" inputmode="decimal"><span id="scale-label">/ 5.0</span></div><div class="target-presets"><button data-target="3.9">3.9</button><button data-target="4.0">4.0</button><span>点击快捷填入，也可自定义</span></div></div>
+        <p class="hint">按最终课程总评成绩计算，包含平时分和考试分。</p>
+        </div></div>
+      </section>
+    </div>
+    <section class="panel course-panel" aria-labelledby="courses-title">
+      <div class="section-heading"><div><div class="section-title"><span class="step">02</span><h2 id="courses-title">本学期待计入课程</h2><span id="course-count" class="count">0 门 · 0 学分</span></div><p class="hint">只添加尚未计入当前绩点的课程。固定预计成绩后，其他课程会重新分配目标。</p></div><div class="toolbar"><button id="download-template" class="button subtle">下载 Excel 模板</button><button id="import-excel" class="button secondary">导入 Excel</button><button id="add-course" class="button primary small">添加课程</button><input id="excel-file" type="file" accept=".xlsx,.xls" hidden></div></div>
+      <div class="table-wrap"><table class="courses-table"><thead><tr><th>课程名称</th><th>学分</th><th>评分方式</th><th>固定／预计成绩</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="course-body"></tbody></table></div>
+      <div id="course-empty" class="empty-state"><strong>从添加一门课开始</strong><p>手动填写，或导入含“课程名称”和“学分”的 Excel。</p></div>
+      <p class="table-footnote">两种评分方式的预计成绩均可留空；填入后才固定该课程。计算后的建议分数和等级统一在第 4 部分查看。</p>
+    </section>
+    <section class="panel rules-panel" aria-labelledby="rules-title">
+      <div class="section-heading"><div><div class="section-title"><span class="step">03</span><h2 id="rules-title">学校绩点换算规则</h2></div><p class="hint">请以你学校的官方规则为准。示例规则不会自动适用于其他学校。</p></div><label class="template-select">规则模板<select id="rule-template"><option value="five">5 分制线性示例</option><option value="custom-linear">自定义线性规则</option><option value="custom-bands">自定义分段规则</option></select></label></div>
+      <div class="rule-layout"><div class="numeric-rules"><h3>百分制成绩</h3><div class="field-grid"><label>绩点满分<input id="gpa-scale" type="number" min="0" step="any" value="5"></label><label>换算方式<select id="rule-mode"><option value="linear">线性换算</option><option value="bands">分数段对应固定绩点</option></select></label></div>
+      <div id="linear-editor"><div class="field-grid three"><label>及格分数<input id="pass-score" type="number" min="0" max="100" step="1" value="60"></label><label>及格对应绩点<input id="base-gpa" type="number" min="0" step="any" value="1"></label><label>每提高 1 分增加绩点<input id="gpa-step" type="number" min="0" step="any" value="0.1"></label></div><p id="formula-preview" class="formula-preview">及格：绩点 = 1 +（成绩 − 60）× 0.1；不及格：0</p></div>
+      <div id="bands-editor" hidden><label>未固定课程的及格分数<input id="band-pass-score" type="number" min="0" max="100" step="1" value="60"></label><p class="hint">下方数值为可编辑示例。每段包含下限、不含上限；最后一段包含 100。须完整覆盖 0–100，绩点随成绩不降低。</p><div id="band-rows"></div><button id="add-band" class="button subtle small">添加分数段</button></div></div>
+      <div class="rating-rules"><h3>等级成绩</h3><p class="hint">填写等级及直接对应的绩点。没有等级课程可留空。</p><div id="rating-rows"></div><button id="add-rating" class="button subtle small">添加等级</button><p class="hint">5 分制示例使用优秀 4.5、良好 3.5、中等 2.5；请按学校官方规则核对，其他等级可自行补充。</p></div></div>
+    </section>
+    <section class="panel plan-panel" id="plan-section" aria-labelledby="action-title">
+      <div class="action-panel"><div><div class="section-title"><span class="step">04</span><h2 id="action-title">生成成绩方案</h2></div><p class="hint">完成前三步后，点击计算，在这里查看累计绩点和各科目标成绩。</p></div><button id="calculate" class="button primary">计算各科目标成绩</button></div>
+      <section class="result" id="result-panel" aria-labelledby="result-title" aria-live="polite">
+        <div class="result-top"><span class="eyebrow">你的目标方案</span><span id="status-badge" class="badge neutral">待计算</span></div>
+        <h2 id="result-title">等待生成成绩方案</h2><p id="result-description" class="result-description">填写前三部分的信息后，点击上方计算按钮，结果会显示在这里。</p>
+        <div class="metric-grid"><div><span>预计累计绩点</span><strong id="metric-forecast">—</strong></div><div><span>最高可达绩点</span><strong id="metric-max">—</strong></div><div><span>本学期所需平均绩点</span><strong id="metric-required">—</strong></div></div>
+        <div class="progress-wrap"><div class="progress-label"><span id="progress-start">当前 —</span><span id="progress-target">目标 —</span></div><div class="progress-track"><div id="progress-fill"></div><span id="progress-marker"></span></div><p id="progress-caption" class="hint">配置学校规则后，结果将使用相同的绩点满分。</p></div>
+        <div id="result-notes" class="result-notes"></div>
+        <div id="result-summary" class="summary-strip">百分制课程默认生成整数目标分数。</div>
+      </section>
+      <div id="course-results" hidden><h3 class="result-table-title">各科成绩方案</h3><div class="table-wrap"><table class="results-table"><thead><tr><th>课程名称</th><th>学分</th><th>目标成绩</th><th>对应绩点</th></tr></thead><tbody id="result-course-body"></tbody></table></div><p class="table-footnote">“已固定”为你填入的成绩，其他成绩为计算器分配的目标。各科可互相补偿，修改第 2 部分的预计成绩可重新分配方案。</p></div>
+    </section>
+    <footer><span>绩点计划</span><p>建议成绩是一套可行组合，不是每科唯一的最低要求。文件解析与计算在本地浏览器完成。</p></footer>
+  </main>
+  <dialog id="import-dialog"><div class="dialog-heading"><div><p class="eyebrow">导入前核对</p><h2>检查课程与评分方式</h2></div><button id="close-import" class="icon-button" aria-label="关闭导入预览">×</button></div><p class="hint">读取第一张工作表；缺少评分方式的课程需要逐行补选。确认后加入现有课程。</p><div class="table-wrap"><table><thead><tr><th>原始行</th><th>课程名称</th><th>学分</th><th>评分方式</th><th>预计成绩</th><th>检查</th><th>操作</th></tr></thead><tbody id="import-body"></tbody></table></div><p id="import-message" role="status"></p><div class="dialog-actions"><button id="cancel-import" class="button secondary">取消</button><button id="confirm-import" class="button primary">确认导入</button></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body></html>
